@@ -1,0 +1,29 @@
+# Tells the challenge which models this repository submits, and describes them.
+# The challenge reads this file from the default branch every time it processes
+# submissions, so edits reach the model's catalog entry without anything else.
+# Keys after `path` are the questions of the challenge's model registration form.
+challenge: templatecast            # the challenge's project_id
+models:
+  - model_id: example_lake_model   # must match the model_id in the file names
+    path: forecasts/               # where the forecast files are
+    long_name: Example lake temperature model
+    description: >-
+      At each lake, a normal distribution with the mean and standard deviation of
+      the 14 most recent observations of surface water temperature, for every
+      day of the forecast horizon. A deliberately simple model that shows the
+      submission format.
+    # CHANGE to this repository's address once it is published.
+    code_url: https://github.com/YOUR-ACCOUNT/challenge-template-example-submission
+    contact_name: Example Author
+    model_type: empirical
+    dynamic: false
+    ic_uncertainty: false
+    has_parameters: Yes and at least one is estimated from data
+    parameter_uncertainty: false
+    assimilation: false
+    uses_drivers: false
+    driver_uncertainty: false
+    process_uncertainty: Yes and estimated from data
+    obs_uncertainty: false
+    structural_uncertainty: false
+    random_effects_uncertainty: false

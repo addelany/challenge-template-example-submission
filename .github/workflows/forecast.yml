@@ -1,0 +1,35 @@
+# Makes a new forecast each day and commits it to forecasts/, where the
+# challenge finds it. Runs the forecast.R in this repository.
+#
+# The schedule is off: turn it on once the repository is registered with the
+# challenge (see README.md), and the challenge's targets are published.
+name: forecast
+
+on:
+  # schedule:
+  #   - cron: '0 18 * * *'
+  workflow_dispatch:
+
+# The workflow commits the new file with the repository's own token.
+permissions:
+  contents: write
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: rocker/tidyverse:4.4.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make the forecast
+        run: Rscript forecast.R
+
+      - name: Commit the forecast
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add forecasts/
+          git diff --cached --quiet || git commit -m "Forecast for $(date -u +%F)"
+          git push
