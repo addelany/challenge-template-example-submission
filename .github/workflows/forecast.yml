@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The weather comes from dynamical.org through Python (gefs_air_temperature.py).
+      # The weather comes from dynamical.org through Python (gefs_weather.py).
       # zarr 3 and icechunk need Python 3.11 or newer, which the image may not have, so
       # uv installs one in a virtual environment.
       - name: Install Python and the weather packages

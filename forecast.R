@@ -4,14 +4,16 @@
 # The model is a regression of water temperature on air temperature, driven by the NOAA
 # GEFS weather ensemble from dynamical.org:
 #
-#   1. Weather. gefs_air_temperature.py reads daily mean 2 m air temperature at each lake
-#      from the "NOAA GEFS forecast, 35 day" dataset on dynamical.org (https://dynamical.org),
-#      which anyone can read over HTTPS with no account: for the past year (the weather
-#      the lakes had) and for the 31 ensemble members of today's forecast run (the weather
-#      to come).
+#   1. Weather. gefs_weather.py reads daily weather at each lake (by default the 2 m air
+#      temperature, but any of GEFS's 27 variables: see WEATHER_VARIABLES below) from
+#      dynamical.org (https://dynamical.org), whose datasets anyone can read over HTTPS
+#      with no account. For the weather the lakes had, it uses the "NOAA GEFS analysis" (the
+#      model's best estimate of past weather, 3-hourly since 2000); for the weather to
+#      come, the 31 ensemble members of the latest "NOAA GEFS forecast, 35 day" run. Both
+#      are the same GEFS model, so a relationship fitted to one carries over to the other.
 #   2. Fit. At each lake, a linear regression of the observed water temperature on that
-#      air temperature (lm(water ~ air)) over the past year.
-#   3. Forecast. Each GEFS member's air temperature goes through the regression, plus a random
+#      weather (lm(water ~ air temperature)) over the past year.
+#   3. Forecast. Each GEFS member's weather goes through the regression, plus a random
 #      draw from the regression's residuals, to make one member of the water temperature
 #      forecast. The 31 members are submitted as an ensemble: the weather uncertainty comes
 #      from GEFS and the model's own uncertainty from the residuals.
@@ -20,7 +22,7 @@
 # targets and the weather and writes the file in the format the challenge expects.
 #
 # Run from the repository root:  Rscript forecast.R
-# Needs the R packages readr, dplyr and tidyr, and Python with the packages in
+# Needs the R packages readr and dplyr, and Python with the packages in
 # requirements.txt (pip install -r requirements.txt) for the weather.
 #
 # Environment variables (all optional)
@@ -30,6 +32,10 @@
 #   TARGETS_URL     where to read the challenge's targets (default: the published file)
 #   SITES_URL       the challenge's site list, with each lake's latitude and longitude
 #   PYTHON          the Python to run (default: python3)
+#   WEATHER_VARIABLES  the GEFS variables to regress on, comma separated (default:
+#                   temperature_2m). Names come from `python3 gefs_weather.py list`; add
+#                   :max, :min, :mean or :sum to choose the daily statistic, e.g.
+#                   temperature_2m,downward_short_wave_radiation_flux_surface,wind_u_10m
 #   TRAIN_DAYS      days of history for the regression (default: 365)
 #   S3_KEY, S3_SECRET  a key that can read the challenge's bucket. Set both when the
 #                   bucket is private (ask the challenge for a read-only key); the
@@ -47,6 +53,10 @@ horizon <- 30                         # days ahead
 requested_date <- as.Date(Sys.getenv("REFERENCE_DATE", format(Sys.Date())))
 train_days <- as.integer(Sys.getenv("TRAIN_DAYS", "365"))
 python <- Sys.getenv("PYTHON", "python3")
+# The weather variables to download and regress on: any names `gefs_weather.py list` prints.
+weather_variables <- trimws(strsplit(Sys.getenv("WEATHER_VARIABLES", "temperature_2m"), ",")[[1]])
+# The columns they come back in: "temperature_2m:max" is the column temperature_2m_max.
+weather_columns <- sub(":", "_", weather_variables, fixed = TRUE)
 targets_url <- Sys.getenv("TARGETS_URL", paste0(
   "https://s3.us-east-005.backblazeb2.com/template-challenge/targets/",
   "project_id=", project_id, "/duration=P1D/lakes-targets.csv.gz"
@@ -119,25 +129,26 @@ last_observed <- max(targets$date)
 message("Targets: ", nrow(targets), " observations at ", n_distinct(targets$site_id),
         " lakes, the latest on ", last_observed)
 
-# Weather: NOAA GEFS air temperature from dynamical.org --------------------------
+# Weather: NOAA GEFS from dynamical.org -------------------------------------------
 # The lakes' coordinates come from the challenge's site list.
 sites_file <- tempfile(fileext = ".csv")
 download.file(sites_url, sites_file, quiet = TRUE)
 
-# Runs gefs_air_temperature.py and reads back the CSV it writes.
+# Runs gefs_weather.py for the chosen variables and reads back the CSV it writes.
 gefs <- function(mode, ...) {
   out <- tempfile(fileext = ".csv")
-  status <- system2(python, c("gefs_air_temperature.py", mode, sites_file, out, ...))
+  status <- system2(python, c("gefs_weather.py", mode, sites_file, out, ...,
+                              "--variables", weather_variables))
   if (status != 0 || !file.exists(out)) {
-    stop("gefs_air_temperature.py failed. Is Python set up? Try: pip install -r requirements.txt",
+    stop("gefs_weather.py failed. Is Python set up? Try: pip install -r requirements.txt",
          call. = FALSE)
   }
   read_csv(out, show_col_types = FALSE, progress = FALSE)
 }
 
-# The weather each lake had over the past year (the regression's input) ...
+# The weather each lake had over the past year (the regression's input), from the GEFS analysis ...
 air_history <- gefs("history", "--date", format(last_observed), "--days", train_days)
-# ... and the weather GEFS forecasts: one air temperature per ensemble member and day.
+# ... and the weather GEFS forecasts: one value per variable, ensemble member and day.
 air_forecast <- gefs("forecast", "--date", format(requested_date), "--horizon", horizon)
 reference_date <- as.Date(air_forecast$init_date[1])   # the GEFS run the forecast starts from
 message("Forecast from the GEFS run of ", reference_date, ": ",
@@ -145,16 +156,17 @@ message("Forecast from the GEFS run of ", reference_date, ": ",
         n_distinct(air_forecast$date), " days")
 
 # Forecast ----------------------------------------------------------------------
-# One regression per lake: water temperature on air temperature.
+# One regression per lake: water temperature on the weather variables.
 training <- inner_join(targets, air_history |> mutate(date = as.Date(date)),
                        by = c("site_id", "date"))
 models <- training |>
   group_by(site_id) |>
   group_map(function(d, key) {
-    fit <- lm(water_temperature ~ air_temperature, data = d)
-    message(key$site_id, ": water = ", round(coef(fit)[[1]], 2), " + ",
-            round(coef(fit)[[2]], 2), " x air  (R2 ", round(summary(fit)$r.squared, 2),
-            ", residual sd ", round(sigma(fit), 2), ", ", nrow(d), " days)")
+    fit <- lm(reformulate(weather_columns, response = "water_temperature"), data = d)
+    message(key$site_id, ": ", paste(names(coef(fit)), round(coef(fit), 3), sep = " = ",
+                                     collapse = ", "),
+            "  (R2 ", round(summary(fit)$r.squared, 2), ", residual sd ", round(sigma(fit), 2),
+            ", ", nrow(d), " days)")
     list(site_id = key$site_id, fit = fit, sigma = sigma(fit))
   }) |>
   (\(x) setNames(x, vapply(x, `[[`, "", "site_id")))()
@@ -164,7 +176,7 @@ forecast <- air_forecast |>
   group_by(site_id) |>
   group_modify(function(d, key) {
     m <- models[[key$site_id]]
-    # Member i's weather through the regression, plus a draw from the residuals.
+    # Each member's weather through the regression, plus a draw from the residuals.
     d$prediction <- predict(m$fit, newdata = d) + rnorm(nrow(d), 0, m$sigma)
     d
   }) |>
