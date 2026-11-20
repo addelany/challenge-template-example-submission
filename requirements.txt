@@ -1,0 +1,6 @@
+icechunk
+xarray
+zarr
+pystac
+numpy
+pandas

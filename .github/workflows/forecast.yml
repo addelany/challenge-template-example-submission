@@ -22,6 +22,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The weather comes from dynamical.org through Python (gefs_air_temperature.py).
+      # zarr 3 and icechunk need Python 3.11 or newer, which the image may not have, so
+      # uv installs one in a virtual environment.
+      - name: Install Python and the weather packages
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 python3-venv python3-pip
+          python3 -m venv /opt/bootstrap
+          /opt/bootstrap/bin/pip install --quiet uv
+          /opt/bootstrap/bin/uv venv /opt/venv --python 3.12
+          /opt/bootstrap/bin/uv pip install --python /opt/venv/bin/python -r requirements.txt
+          echo "PYTHON=/opt/venv/bin/python" >> "$GITHUB_ENV"
+
       # The packages and the MinIO client are only used when the challenge's
       # bucket is private. MinIO has withdrawn the download minioclient uses
       # (HTTP 410 Gone), so the challenge engine's action installs mc from its

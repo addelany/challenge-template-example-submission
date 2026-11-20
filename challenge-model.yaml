@@ -6,13 +6,14 @@ challenge: templatecast            # the challenge's project_id
 models:
   - model_id: example_lake_model   # must match the model_id in the file names
     path: forecasts/               # where the forecast files are
-    long_name: Example lake temperature model
+    long_name: Example lake temperature model (GEFS air temperature regression)
     description: >-
-      At each lake, a normal distribution with the mean and standard deviation of
-      the 14 most recent observations of surface water temperature, for every
-      day of the forecast horizon. A deliberately simple model that shows the
-      submission format.
-    # CHANGE to this repository's address once it is published.
+      At each lake, a linear regression of daily mean water temperature on daily mean
+      2 m air temperature, fitted to the past year. It is driven by the 31 members of the NOAA
+      GEFS ensemble weather forecast (read from dynamical.org), each member's air temperature
+      passed through the regression plus a draw from its residuals, to give a 31-member ensemble
+      forecast of water temperature. A deliberately simple model that shows the ensemble
+      submission format and how to read weather forecasts from dynamical.org.
     code_url: https://github.com/rqthomas/challenge-template-example-submission
     contact_name: Example Author
     model_type: empirical
@@ -21,8 +22,8 @@ models:
     has_parameters: Yes and at least one is estimated from data
     parameter_uncertainty: false
     assimilation: false
-    uses_drivers: false
-    driver_uncertainty: false
+    uses_drivers: true
+    driver_uncertainty: true
     process_uncertainty: Yes and estimated from data
     obs_uncertainty: false
     structural_uncertainty: false
