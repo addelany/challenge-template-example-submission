@@ -5,3 +5,4 @@ pystac
 numpy
 pandas
 boto3
+pyyaml

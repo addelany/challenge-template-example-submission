@@ -10,6 +10,12 @@ on:
      - cron: '0 18 * * *'
   workflow_dispatch:
 
+# One job at a time changes forecasts/, so a new forecast's commit never races the
+# clean-up (cleanup-forecasts.yml) or another forecast.
+concurrency:
+  group: forecasts-repo
+  cancel-in-progress: false
+
 # The workflow commits the new file with the repository's own token.
 permissions:
   contents: write

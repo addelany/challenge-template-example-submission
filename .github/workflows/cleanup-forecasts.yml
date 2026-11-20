@@ -1,0 +1,75 @@
+# Removes forecast files from forecasts/ once the challenge has them on its S3 storage,
+# so the repository does not fill up with files the challenge has already read. It
+# compares each file here with the list the challenge publishes of what it processed
+# (see cleanup_forecasts.py) and deletes only files it has processed, exactly as they
+# are here. Nothing is deleted if the list cannot be read.
+#
+# Run it by hand from the Actions tab (tick "Dry run" first to see what it would
+# delete), or switch the schedule on. If the challenge's bucket is private, add the
+# secrets S3_KEY and S3_SECRET (a read-only key); a repository variable S3_BASE_URL
+# names a different bucket than the script's default.
+name: cleanup-forecasts
+
+on:
+  # schedule:
+  #   - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: only list what would be deleted'
+        type: boolean
+        default: false
+      keep:
+        description: 'Keep the newest N forecasts the challenge already has'
+        type: string
+        default: '0'
+      keep_days:
+        description: 'Keep every forecast from the last N days, whether or not the challenge has it'
+        type: string
+        default: '0'
+
+# One job at a time changes forecasts/, so a clean-up never races a new forecast's commit.
+concurrency:
+  group: forecasts-repo
+  cancel-in-progress: false
+
+# The workflow commits the deletions with the repository's own token.
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Only what the clean-up needs, not the weather packages of requirements.txt.
+      - name: Install the packages
+        run: pip install pandas pyyaml boto3
+
+      - name: Delete the forecasts the challenge has
+        env:
+          S3_BASE_URL: ${{ vars.S3_BASE_URL }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          KEEP: ${{ inputs.keep }}
+          KEEP_DAYS: ${{ inputs.keep_days }}
+        run: |
+          args=(--keep "${KEEP:-0}" --keep-days "${KEEP_DAYS:-0}")
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          python cleanup_forecasts.py "${args[@]}"
+
+      - name: Commit the deletions
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A forecasts/
+          git diff --cached --quiet || git commit -m "Remove forecasts the challenge has already processed"
+          git push

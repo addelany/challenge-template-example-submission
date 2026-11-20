@@ -15,8 +15,13 @@ forecasts/             the forecast files: <theme>-<reference date>-<model_id>.c
 forecast.R             makes a forecast and writes the file (R)
 forecast.py            the same forecast, in Python only
 gefs_weather.py        reads weather (any GEFS variables) from dynamical.org (Python)
+challenge_s3.py        reads a CSV from the challenge's S3 storage, with a key if it is private
+cleanup_forecasts.py   deletes forecast files the challenge has already processed
+check_forecast.py      checks a forecast file before you push it
+AGENTS.md              guidance for an AI assistant writing and submitting forecasts here
 requirements.txt       the Python packages it needs
-.github/workflows/     optional: run forecast.R (or forecast.py) every day and commit the file
+.github/workflows/     optional: run forecast.R (or forecast.py) every day and commit the file;
+                       clean up forecasts the challenge has already read
 ```
 
 ## The model
@@ -158,6 +163,73 @@ published at
 `<forecasts bucket>/submission_results/example_lake_model.csv` (the challenge's
 "How to forecast" page gives the address).
 
+## Submitting from your own computer
+
+You do not need GitHub Actions to submit. If you make the forecast on your laptop, a
+server or a cluster, a submission is a new file in `forecasts/` that you **push** to this
+repository's default branch (`main`). The challenge reads the repository, not your
+computer, so nothing else is uploaded. Do the registration steps above once; after that,
+for each forecast:
+
+```sh
+# once: get the repository and what the scripts need
+git clone https://github.com/<you>/<this-repository>.git
+cd <this-repository>
+pip install -r requirements.txt
+
+# each time: bring your copy up to date, make the forecast, and push it
+git pull --rebase                      # picks up anything pushed from elsewhere
+python forecast.py                     # or: Rscript forecast.R, or any tool you like
+git status                             # one new file in forecasts/
+python check_forecast.py forecasts/lakes-2026-11-20-example_lake_model.csv.gz   # exit status 0 = fine
+git add forecasts/lakes-2026-11-20-example_lake_model.csv.gz   # the file it wrote
+git commit -m "Forecast for 2026-11-20"
+git push
+```
+
+- **Any tool will do.** The only requirement is a file in `forecasts/` named
+  `<theme>-<YYYY-MM-DD>-<model_id>.csv.gz` (or `.csv`), in the format described above. If a
+  model of your own makes it, save it there with that name and `git add` it.
+- **Add new files; never edit one the challenge has read.** A file is read the first time
+  it is seen, and later changes to it are ignored, so a corrected forecast needs a new
+  reference date (a new file name). Do not force-push or rewrite history over files you
+  have already pushed.
+- **Check the name before you push.** The date is the day the forecast starts from, the
+  model id must be the one in `challenge-model.yaml`, and the folder must be the `path`
+  given there. A file with another name is skipped, and the reason is published.
+- **Signing in to GitHub.** `git push` needs your credentials: sign in with the GitHub CLI
+  (`gh auth login`), use an SSH key, or give a personal access token when asked for a
+  password. The repository itself must stay **public**, because the challenge reads it
+  without a key.
+- **If a push is rejected** ("fetch first"), something else added a commit, such as a
+  scheduled workflow or another machine. Run `git pull --rebase` and push again.
+
+The challenge picks the file up the next time it processes submissions, which it does on
+its own schedule (every few hours, once its workflow is on). To see what happened to a
+file, read the list the challenge publishes for your model (the same one
+`cleanup_forecasts.py` uses). It has one row per file with a `status`, and a `reason` when
+a file was rejected:
+
+```sh
+python -c "from challenge_s3 import read_csv; print(read_csv('https://s3.us-east-005.backblazeb2.com/template-challenge/submission_results/example_lake_model.csv').tail())"
+```
+
+For a private bucket, set `S3_KEY` and `S3_SECRET` (a read-only key) first. A status of
+`processed` means the forecast is in the challenge, and `invalid` explains what to fix
+(then submit a new file). Once a file is processed you can delete it from your computer and
+the repository (see *Cleaning up forecasts the challenge already has*).
+
+To make forecasts on a schedule from your own machine, run the same commands from `cron`
+(or any scheduler), for example every day at 18:00:
+
+```sh
+0 18 * * *  cd /path/to/this-repository && git pull --rebase && python forecast.py && git add forecasts && git commit -m "Forecast" && git push
+```
+
+(The `&&` chain stops at the first failure, so a failed forecast pushes nothing.) If you
+also use the workflows, they and your computer then both add files, which is fine as long
+as each reference date is made in only one place.
+
 ## Things to know
 
 - A file is read **the first time it is seen**; editing it later has no effect.
@@ -190,6 +262,49 @@ variables → Actions → New repository secret); the workflow passes them on. N
 a key. The workflow commits each new forecast with the repository's built-in token, so
 it needs no other secret; if the push is refused, set **Settings → Actions → General →
 Workflow permissions** to *Read and write permissions*.
+
+## Cleaning up forecasts the challenge already has
+
+A daily forecast adds a file to `forecasts/` every day. Once the challenge has read a file
+it keeps its own copy, so the one here can go. `cleanup_forecasts.py` deletes the files the
+challenge has processed and keeps the rest:
+
+```sh
+python cleanup_forecasts.py --dry-run    # say what would be deleted
+python cleanup_forecasts.py              # delete it
+python cleanup_forecasts.py --keep 3     # but keep the newest 3 forecasts the challenge has
+python cleanup_forecasts.py --keep-days 7   # but keep everything from the last 7 days
+```
+
+It does not look for the forecast data themselves on the S3 storage; it reads the list the
+challenge publishes of every file it has handled, one per model at
+`<bucket>/submission_results/<model_id>.csv`. That list gives each file's path, its git
+blob SHA (a fingerprint of its contents, which the script works out for the file here) and a
+status. A file is deleted only if the list has **the same path with the same SHA and the
+status `processed`**. These are kept, with the reason printed:
+
+- a file the challenge has not processed yet (or has not seen);
+- a file it rejected (status `invalid`; fix the forecast and submit a new file);
+- a file that was edited after the challenge processed it (the challenge ignores such
+  edits, so what is here is no longer what it has).
+
+`--keep-days D` keeps every forecast from the last `D` days whether or not the challenge
+has it, which gives you a window of recent forecasts to look at (or to resubmit from if
+something went wrong). A forecast's age is today (UTC) minus the date in its file name,
+so with `--keep-days 7` the files dated 7 days ago or later stay. `--keep N` and
+`--keep-days D` are independent: a forecast stays if it is among the newest `N` the
+challenge has *or* is from the last `D` days. The workflow has an input for each.
+
+If the list cannot be read (wrong address, a private bucket without a key, no network),
+nothing is deleted and the script stops with an error. Files for other models, and other
+files, are never touched. Set `S3_BASE_URL` for a different bucket than the template
+challenge's, and `S3_KEY` and `S3_SECRET` (a read-only key) if the bucket is private.
+
+`.github/workflows/cleanup-forecasts.yml` runs it from the Actions tab (tick *Dry run*
+first) and commits the deletions; the weekly schedule in it is commented out. The
+workflows that change `forecasts/` share one concurrency group, so a clean-up never races a
+new forecast's commit. Deleting a file only removes it from the current files: it stays in
+the repository's git history.
 
 ## Making a forecast every day
 

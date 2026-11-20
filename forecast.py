@@ -41,17 +41,15 @@ Environment variables (all optional)
                   private (ask the challenge for a read-only key); the targets are then
                   downloaded with the key instead of by URL (this uses boto3).
 """
-import io
 import os
-import re
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
 
 import numpy as np
 import pandas as pd
 
 import gefs_weather as gefs
+from challenge_s3 import read_csv
 
 PROJECT_ID = "templatecast"          # the challenge's project_id
 THEME = "lakes"                      # prefix of the file name, from the challenge
@@ -73,31 +71,8 @@ weather_variables = [v.strip() for v in
 weather_columns = [v.replace(":", "_") for v in weather_variables]
 
 
-# Reading the targets -----------------------------------------------------------
-def read_targets(url):
-    """Read the targets by URL; with S3_KEY and S3_SECRET set, through the S3 API with the
-    key instead, which also works when the bucket is private."""
-    key, secret = os.environ.get("S3_KEY", ""), os.environ.get("S3_SECRET", "")
-    if not url.startswith(("http://", "https://")) or not (key and secret):
-        return pd.read_csv(url)
-    import boto3                                    # only needed for a private bucket
-    from botocore.config import Config
-
-    parts = urlparse(url)                           # https://<endpoint>/<bucket>/<object>
-    bucket, _, name = parts.path.lstrip("/").partition("/")
-    region = re.match(r"^s3\.([a-z0-9-]+)\.backblazeb2\.com$", parts.netloc)
-    s3 = boto3.client(
-        "s3", endpoint_url=f"{parts.scheme}://{parts.netloc}",
-        aws_access_key_id=key, aws_secret_access_key=secret,
-        region_name=region.group(1) if region else "us-east-1",
-        config=Config(s3={"addressing_style": "path"}),
-    )
-    body = s3.get_object(Bucket=bucket, Key=name)["Body"].read()
-    return pd.read_csv(io.BytesIO(body), compression="gzip" if name.endswith(".gz") else None)
-
-
 # Targets: the observed water temperature -----------------------------------------
-targets = read_targets(targets_url)
+targets = read_csv(targets_url)   # by URL, or with S3_KEY / S3_SECRET for a private bucket
 targets = targets[(targets["variable"] == "temperature") & targets["observation"].notna()].copy()
 targets["date"] = pd.to_datetime(targets["datetime"], utc=True).dt.tz_localize(None).dt.normalize()
 targets = targets[targets["date"] <= requested_date]
