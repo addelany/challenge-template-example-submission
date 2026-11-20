@@ -6,8 +6,8 @@
 name: forecast
 
 on:
-  # schedule:
-  #   - cron: '0 18 * * *'
+  schedule:
+     - cron: '0 18 * * *'
   workflow_dispatch:
 
 # The workflow commits the new file with the repository's own token.
