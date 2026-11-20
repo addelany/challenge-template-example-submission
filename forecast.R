@@ -22,10 +22,8 @@ model_id <- "example_lake_model"      # must match challenge-model.yaml
 horizon <- 30                         # days ahead
 
 reference_date <- as.Date(Sys.getenv("REFERENCE_DATE", format(Sys.Date())))
-targets_url <- Sys.getenv("TARGETS_URL", paste0(
-  "https://sdsc.osn.xsede.org/bio230014-bucket01/challenges/targets/",
-  "project_id=", project_id, "/duration=P1D/lakes-targets.csv.gz"
-))
+targets_url <- Sys.getenv("TARGETS_URL",
+                          "https://s3.us-east-005.backblazeb2.com/template-challenge/targets/project_id=templatecast/duration=P1D/lakes-targets.csv.gz")
 
 # Targets: the observations so far ---------------------------------------------
 targets <- read_csv(targets_url, show_col_types = FALSE, progress = FALSE) |>
