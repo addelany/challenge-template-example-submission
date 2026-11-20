@@ -13,7 +13,7 @@ models:
       day of the forecast horizon. A deliberately simple model that shows the
       submission format.
     # CHANGE to this repository's address once it is published.
-    code_url: https://github.com/YOUR-ACCOUNT/challenge-template-example-submission
+    code_url: https://github.com/rqthomas/challenge-template-example-submission
     contact_name: Example Author
     model_type: empirical
     dynamic: false
