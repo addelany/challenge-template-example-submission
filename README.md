@@ -68,6 +68,22 @@ published at
 - `challenge-model.yaml`'s `code_url` still says `YOUR-ACCOUNT`; set it to this
   repository's address when you publish it.
 
+## If the challenge's bucket is private
+
+By default `forecast.R` reads the targets by their public URL. If the challenge keeps
+its bucket private, ask its organizers for a **read-only key**, then set two
+environment variables and nothing else changes:
+
+```sh
+export S3_KEY=<key id> S3_SECRET=<application key>
+Rscript forecast.R        # also needs the minioclient package
+```
+
+The script then reads the same address through the S3 API with the key: it downloads
+the targets file to a temporary folder and reads that. In GitHub Actions add the
+two values as repository secrets named `S3_KEY` and `S3_SECRET`; the workflow
+passes them on. Never commit a key.
+
 ## Making a forecast every day
 
 `.github/workflows/forecast.yml` runs `forecast.R` and commits the new file. Its

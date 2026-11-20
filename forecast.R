@@ -12,6 +12,9 @@
 # Environment variables (all optional)
 #   REFERENCE_DATE  the day the forecast starts from, YYYY-MM-DD (default: today)
 #   TARGETS_URL     where to read the challenge's targets (default: the published file)
+#   S3_KEY, S3_SECRET  a key that can read the challenge's bucket. Set both when the
+#                   bucket is private (ask the challenge for a read-only key); the
+#                   targets are then downloaded with the key instead of by URL.
 
 library(readr)
 library(dplyr)
@@ -23,12 +26,32 @@ horizon <- 30                         # days ahead
 
 reference_date <- as.Date(Sys.getenv("REFERENCE_DATE", format(Sys.Date())))
 targets_url <- Sys.getenv("TARGETS_URL", paste0(
-  "https://sdsc.osn.xsede.org/bio230014-bucket01/challenges/targets/",
+  "https://s3.us-east-005.backblazeb2.com/template-challenge/targets/",
   "project_id=", project_id, "/duration=P1D/lakes-targets.csv.gz"
 ))
 
+# Reading the targets -----------------------------------------------------------
+# A public bucket is read by its URL. With S3_KEY and S3_SECRET set, the same
+# address is read through the S3 API with the key, which also works when the bucket
+# is private: the file is downloaded to a temporary folder first.
+read_targets <- function(url) {
+  key <- Sys.getenv("S3_KEY")
+  secret <- Sys.getenv("S3_SECRET")
+  if (!grepl("^https://", url) || !nzchar(key) || !nzchar(secret)) {
+    return(read_csv(url, show_col_types = FALSE, progress = FALSE))
+  }
+  # https://<endpoint>/<bucket>/<object>
+  parts <- regmatches(url, regexec("^https://([^/]+)/(.+)$", url))[[1]]
+  minioclient::install_mc()
+  minioclient::mc_alias_set("challenge", parts[2], key, secret)
+  local <- tempfile(fileext = ".csv.gz")
+  on.exit(unlink(local))
+  minioclient::mc_cp(paste0("challenge/", parts[3]), shQuote(local))
+  read_csv(local, show_col_types = FALSE, progress = FALSE)
+}
+
 # Targets: the observations so far ---------------------------------------------
-targets <- read_csv(targets_url, show_col_types = FALSE, progress = FALSE) |>
+targets <- read_targets(targets_url) |>
   filter(variable == "temperature", !is.na(observation), as.Date(datetime) <= reference_date)
 
 # Forecast ----------------------------------------------------------------------

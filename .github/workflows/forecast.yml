@@ -22,7 +22,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # minioclient is only used when the challenge's bucket is private.
+      - name: Install packages
+        run: Rscript -e 'install.packages("minioclient")'
+
+      # Set the secrets S3_KEY and S3_SECRET (a key that can read the challenge's
+      # bucket) if the bucket is private. Without them the targets are read by URL.
       - name: Make the forecast
+        env:
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
         run: Rscript forecast.R
 
       - name: Commit the forecast
