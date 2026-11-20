@@ -15,6 +15,7 @@
 #   S3_KEY, S3_SECRET  a key that can read the challenge's bucket. Set both when the
 #                   bucket is private (ask the challenge for a read-only key); the
 #                   targets are then downloaded with the key instead of by URL.
+#                   This needs the minioclient and openssl packages.
 
 library(readr)
 library(dplyr)
@@ -30,6 +31,41 @@ targets_url <- Sys.getenv("TARGETS_URL", paste0(
   "project_id=", project_id, "/duration=P1D/lakes-targets.csv.gz"
 ))
 
+# Installing mc -----------------------------------------------------------------
+# Reading with a key uses the MinIO client (mc). minioclient::install_mc() downloads
+# it from dl.min.io, which MinIO has withdrawn (HTTP 410 Gone), so when that fails
+# the pinned release is taken from GitHub instead and checked against its published
+# SHA-256. In GitHub Actions the workflow has installed mc already.
+ensure_mc <- function() {
+  ok <- tryCatch({
+    suppressWarnings(minioclient::install_mc())
+    TRUE
+  }, error = function(e) FALSE)
+  if (ok) return(invisible())
+
+  release <- "RELEASE.2025-08-13T08-35-41Z"
+  os <- c(Linux = "linux", Darwin = "darwin", Windows = "windows")[[Sys.info()[["sysname"]]]]
+  cpu <- if (Sys.info()[["machine"]] %in% c("arm64", "aarch64")) "arm64" else "amd64"
+  asset <- paste0("mc.", os, "-", cpu, ".", release, if (os == "windows") ".exe")
+  url <- paste0("https://github.com/minio/mc/releases/download/", release, "/", asset)
+  dir <- getOption("minioclient.dir", tools::R_user_dir("minioclient", "data"))
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  dest <- file.path(dir, if (os == "windows") "mc.exe" else "mc")
+
+  options(timeout = max(600, getOption("timeout")))
+  utils::download.file(url, dest, mode = "wb", quiet = TRUE)
+  sums <- tempfile()
+  utils::download.file(paste0(url, ".sha256sum"), sums, quiet = TRUE)
+  expected <- strsplit(readLines(sums, n = 1), " ")[[1]][1]
+  actual <- as.character(openssl::sha256(file(dest)))
+  if (!isTRUE(actual == expected)) {
+    unlink(dest)
+    stop("The downloaded mc does not match its published checksum.")
+  }
+  Sys.chmod(dest, "755")
+  invisible()
+}
+
 # Reading the targets -----------------------------------------------------------
 # A public bucket is read by its URL. With S3_KEY and S3_SECRET set, the same
 # address is read through the S3 API with the key, which also works when the bucket
@@ -42,7 +78,7 @@ read_targets <- function(url) {
   }
   # https://<endpoint>/<bucket>/<object>
   parts <- regmatches(url, regexec("^https://([^/]+)/(.+)$", url))[[1]]
-  minioclient::install_mc()
+  ensure_mc()
   minioclient::mc_alias_set("challenge", parts[2], key, secret)
   local <- tempfile(fileext = ".csv.gz")
   on.exit(unlink(local))

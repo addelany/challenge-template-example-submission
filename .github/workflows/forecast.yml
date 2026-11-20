@@ -22,9 +22,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # minioclient is only used when the challenge's bucket is private.
+      # The packages and the MinIO client are only used when the challenge's
+      # bucket is private. MinIO has withdrawn the download minioclient uses
+      # (HTTP 410 Gone), so the challenge engine's action installs mc from its
+      # GitHub release, where minioclient looks for it.
       - name: Install packages
-        run: Rscript -e 'install.packages("minioclient")'
+        run: Rscript -e 'install.packages(c("minioclient", "openssl"))'
+
+      - uses: rqthomas/challenge-ci/.github/actions/install-mc@v0.1.0-rc.2
 
       # Set the secrets S3_KEY and S3_SECRET (a key that can read the challenge's
       # bucket) if the bucket is private. Without them the targets are read by URL.

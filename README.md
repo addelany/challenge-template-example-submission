@@ -76,11 +76,14 @@ environment variables and nothing else changes:
 
 ```sh
 export S3_KEY=<key id> S3_SECRET=<application key>
-Rscript forecast.R        # also needs the minioclient package
+Rscript forecast.R        # also needs the minioclient and openssl packages
 ```
 
 The script then reads the same address through the S3 API with the key: it downloads
-the targets file to a temporary folder and reads that. In GitHub Actions add the
+the targets file to a temporary folder and reads that. This uses the MinIO client
+(`mc`). `minioclient::install_mc()` no longer works, because MinIO has withdrawn the
+download it uses (HTTP 410 Gone), so `forecast.R` installs the last release from
+GitHub instead and checks its SHA-256. In GitHub Actions add the
 two values as repository secrets named `S3_KEY` and `S3_SECRET`; the workflow
 passes them on. Never commit a key.
 
