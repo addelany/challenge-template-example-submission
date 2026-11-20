@@ -40,7 +40,7 @@
 #   S3_KEY, S3_SECRET  a key that can read the challenge's bucket. Set both when the
 #                   bucket is private (ask the challenge for a read-only key); the
 #                   targets are then downloaded with the key instead of by URL.
-#                   This needs the minioclient and openssl packages.
+#                   This needs the paws.storage package.
 
 library(readr)
 library(dplyr)
@@ -64,58 +64,37 @@ targets_url <- Sys.getenv("TARGETS_URL", paste0(
 sites_url <- Sys.getenv("SITES_URL",
   "https://raw.githubusercontent.com/rqthomas/challenge-template/main/sites.csv")
 
-# Installing mc -----------------------------------------------------------------
-# Reading with a key uses the MinIO client (mc). minioclient::install_mc() downloads
-# it from dl.min.io, which MinIO has withdrawn (HTTP 410 Gone), so when that fails
-# the pinned release is taken from GitHub instead and checked against its published
-# SHA-256. In GitHub Actions the workflow has installed mc already.
-ensure_mc <- function() {
-  ok <- tryCatch({
-    suppressWarnings(minioclient::install_mc())
-    TRUE
-  }, error = function(e) FALSE)
-  if (ok) return(invisible())
-
-  release <- "RELEASE.2025-08-13T08-35-41Z"
-  os <- c(Linux = "linux", Darwin = "darwin", Windows = "windows")[[Sys.info()[["sysname"]]]]
-  cpu <- if (Sys.info()[["machine"]] %in% c("arm64", "aarch64")) "arm64" else "amd64"
-  asset <- paste0("mc.", os, "-", cpu, ".", release, if (os == "windows") ".exe")
-  url <- paste0("https://github.com/minio/mc/releases/download/", release, "/", asset)
-  dir <- getOption("minioclient.dir", tools::R_user_dir("minioclient", "data"))
-  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
-  dest <- file.path(dir, if (os == "windows") "mc.exe" else "mc")
-
-  options(timeout = max(600, getOption("timeout")))
-  utils::download.file(url, dest, mode = "wb", quiet = TRUE)
-  sums <- tempfile()
-  utils::download.file(paste0(url, ".sha256sum"), sums, quiet = TRUE)
-  expected <- strsplit(readLines(sums, n = 1), " ")[[1]][1]
-  actual <- as.character(openssl::sha256(file(dest)))
-  if (!isTRUE(actual == expected)) {
-    unlink(dest)
-    stop("The downloaded mc does not match its published checksum.")
-  }
-  Sys.chmod(dest, "755")
-  invisible()
-}
-
 # Reading the targets -----------------------------------------------------------
 # A public bucket is read by its URL. With S3_KEY and S3_SECRET set, the same
 # address is read through the S3 API with the key, which also works when the bucket
-# is private: the file is downloaded to a temporary folder first.
+# is private: the file is downloaded to a temporary folder first. (paws.storage is
+# the S3 client; it is plain R, so there is nothing else to install.)
 read_targets <- function(url) {
   key <- Sys.getenv("S3_KEY")
   secret <- Sys.getenv("S3_SECRET")
-  if (!grepl("^https://", url) || !nzchar(key) || !nzchar(secret)) {
+  if (!grepl("^https?://", url) || !nzchar(key) || !nzchar(secret)) {
     return(read_csv(url, show_col_types = FALSE, progress = FALSE))
   }
   # https://<endpoint>/<bucket>/<object>
-  parts <- regmatches(url, regexec("^https://([^/]+)/(.+)$", url))[[1]]
-  ensure_mc()
-  minioclient::mc_alias_set("challenge", parts[2], key, secret)
-  local <- tempfile(fileext = ".csv.gz")
+  parts <- regmatches(url, regexec("^(https?://[^/]+)/([^/]+)/(.+)$", url))[[1]]
+  endpoint <- parts[2]
+  # Backblaze B2 endpoints name their region: s3.<region>.backblazeb2.com
+  region <- sub("^https?://s3\\.([a-z0-9-]+)\\.backblazeb2\\.com$", "\\1", endpoint)
+  if (identical(region, endpoint)) region <- "us-east-1"
+  config <- list(
+    credentials = list(creds = list(access_key_id = key, secret_access_key = secret)),
+    endpoint = endpoint, region = region, s3_force_path_style = TRUE
+  )
+  # Newer paws sends a checksum with every request; ask it not to, which some
+  # S3-compatible stores need (older paws does not have the setting).
+  s3 <- tryCatch(
+    paws.storage::s3(config = c(config, list(request_checksum_calculation = "when_required"))),
+    error = function(e) paws.storage::s3(config = config)
+  )
+  body <- s3$get_object(Bucket = parts[3], Key = parts[4])$Body
+  local <- tempfile(fileext = if (grepl("\\.gz$", parts[4])) ".csv.gz" else ".csv")
   on.exit(unlink(local))
-  minioclient::mc_cp(paste0("challenge/", parts[3]), shQuote(local))
+  writeBin(body, local)
   read_csv(local, show_col_types = FALSE, progress = FALSE)
 }
 
