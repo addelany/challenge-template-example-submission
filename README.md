@@ -12,10 +12,11 @@ from this repository, which only has to be **public**.
 ```
 challenge-model.yaml   which model this repository submits, and its metadata
 forecasts/             the forecast files: <theme>-<reference date>-<model_id>.csv.gz
-forecast.R             makes a forecast and writes the file
+forecast.R             makes a forecast and writes the file (R)
+forecast.py            the same forecast, in Python only
 gefs_weather.py        reads weather (any GEFS variables) from dynamical.org (Python)
 requirements.txt       the Python packages it needs
-.github/workflows/     optional: runs forecast.R every day and commits the file
+.github/workflows/     optional: run forecast.R (or forecast.py) every day and commit the file
 ```
 
 ## The model
@@ -42,14 +43,27 @@ forecast, so the forecast is an **ensemble** of 31 members:
    uncertainty comes from the 31 GEFS members and the model's own from the residuals.
 
 ```sh
-pip install -r requirements.txt     # Python: icechunk, xarray, zarr, pystac, numpy, pandas
+pip install -r requirements.txt     # Python: icechunk, xarray, zarr, pystac, numpy, pandas, boto3
 Rscript forecast.R                  # R: readr and dplyr
+python forecast.py                  # or the same model in Python only
 ```
 
 It writes `forecasts/lakes-<GEFS run date>-example_lake_model.csv.gz`. The file in this
 repository is for the 2026-11-19 run. The model is a simple one on purpose: replace the
 "Forecast" section of `forecast.R` with your own (other GEFS variables, a better regression, a
 process model) and keep the rest.
+
+### Python only
+
+`forecast.py` is the same model written in Python, for people who do not use R. It uses
+`gefs_weather.py` directly (`import gefs_weather`), fits the regressions with NumPy, and
+writes the same file, with the same environment variables (`REFERENCE_DATE`, `TARGETS_URL`,
+`SITES_URL`, `TRAIN_DAYS`, `WEATHER_VARIABLES`, `S3_KEY` and `S3_SECRET`). With a private
+bucket it reads the targets through `boto3` with the key, so it needs no extra program. The
+two versions give the same regressions; the 31 members differ only in their random draws.
+They write the same file name, so use one of them for a given model. To run the Python one
+every day use `.github/workflows/forecast-python.yml` instead of `forecast.yml`; it needs
+no container and no R.
 
 ### Choosing weather variables
 
@@ -181,7 +195,7 @@ Workflow permissions** to *Read and write permissions*.
 
 ## Making a forecast every day
 
-`.github/workflows/forecast.yml` installs Python and the packages in `requirements.txt`, runs
+`.github/workflows/forecast.yml` (or `forecast-python.yml`, for `forecast.py`) installs Python and the packages in `requirements.txt`, runs
 `forecast.R` and commits the new file. Its
 schedule is commented out: switch it on once the repository is registered and
 the challenge's targets are published, since the forecast needs them. (Without

@@ -4,3 +4,4 @@ zarr
 pystac
 numpy
 pandas
+boto3

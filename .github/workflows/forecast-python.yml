@@ -1,0 +1,49 @@
+# The same daily forecast as forecast.yml, made with forecast.py (Python only): installs
+# the packages in requirements.txt, runs forecast.py and commits the new file to
+# forecasts/, where the challenge finds it. Use this workflow or forecast.yml, not both:
+# they write the same file.
+#
+# The schedule is off: turn it on once the repository is registered with the challenge
+# (see README.md), and the challenge's targets are published.
+name: forecast-python
+
+on:
+  # schedule:
+  #   - cron: '0 18 * * *'
+  workflow_dispatch:
+
+# The workflow commits the new file with the repository's own token.
+permissions:
+  contents: write
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # zarr 3 and icechunk need Python 3.11 or newer.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install the packages
+        run: pip install -r requirements.txt
+
+      # Set the secrets S3_KEY and S3_SECRET (a key that can read the challenge's
+      # bucket) if the bucket is private. Without them the targets are read by URL.
+      - name: Make the forecast
+        env:
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+        run: python forecast.py
+
+      - name: Commit the forecast
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add forecasts/
+          git diff --cached --quiet || git commit -m "Forecast for $(date -u +%F)"
+          git push
