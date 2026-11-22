@@ -49,9 +49,10 @@ python cleanup_forecasts.py --dry-run  # what the challenge has already processe
   workflow, or run `cleanup_forecasts.py` without `--dry-run` unless the user has said to
   in this conversation. Show the user the new file's summary (`check_forecast.py` output)
   first.
-- **Names must agree.** The file name `<theme>-<YYYY-MM-DD>-<model_id>.csv.gz`, the
-  `model_id` column and `model_id` in `challenge-model.yaml` must all be the same model,
-  and the date is the `reference_datetime`. A model id belongs to the first repository
+- **Names must agree.** The `model_id` column and `model_id` in `challenge-model.yaml` must
+  be the same model (the file name is free; the example writes
+  `<theme>-<YYYY-MM-DD>-<model_id>.csv.gz`, with the date as the `reference_datetime`).
+  A model id belongs to the first repository
   that registered it, so changing it creates a new model that needs registering again:
   do not rename it casually. Leave `challenge:` (the project id) alone.
 - **Only use what was known at the reference date.** The targets are filtered to
@@ -70,8 +71,9 @@ python cleanup_forecasts.py --dry-run  # what the challenge has already processe
 
 ## The forecast format in short
 
-One CSV (or CSV.GZ) per model and reference date, in `forecasts/`, with these columns:
-`project_id`, `model_id`, `reference_datetime` (the start day), `datetime` (the forecast day,
+One CSV (or CSV.GZ) per model and reference date, in `forecasts/`, with these columns (a
+`project_id` column is an optional label for the challenge a row is for):
+`model_id`, `reference_datetime` (the start day), `datetime` (the forecast day,
 strictly after it), `duration` (`P1D`), `site_id`, `variable` (`temperature`), `family`,
 `parameter` and `prediction`. Dates are `YYYY-MM-DD` in UTC. At most 30 days ahead for this
 challenge, no missing predictions, no duplicate rows.
@@ -79,8 +81,8 @@ challenge, no missing predictions, no duplicate rows.
 - A `normal` forecast has a `mu` and a `sigma` row per site and date.
 - An ensemble (what the example submits) has `family` `ensemble` or `sample` and the member
   number as `parameter`, up to 500 members.
-- One model and one family per file. Sites are `BARC`, `SUGG` and `CRAM` (the challenge's
-  `sites.csv`).
+- One model and one family per file. Sites are `fcre` and `bvre`, the two Virginia reservoirs (the
+  challenge's `sites.csv`).
 
 If this summary and the challenge's "How to forecast" page disagree, the page is right.
 

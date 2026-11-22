@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example forecast for the template challenge ("templatecast"), in Python only.
 
-Daily surface water temperature at three lakes, up to 30 days ahead, as a 31-member
+Daily water temperature at two reservoirs, up to 30 days ahead, as a 31-member
 ensemble. This is the same model as forecast.R, for people who work in Python: a
 regression of water temperature on air temperature, driven by the NOAA GEFS weather
 ensemble from dynamical.org.
@@ -131,7 +131,7 @@ for site, (beta, sigma) in models.items():
 # One row per site, date and ensemble member (the member number is the `parameter`).
 # See the challenge's "How to forecast" page for the full description of the columns.
 forecast = pd.DataFrame({
-    "project_id": PROJECT_ID,
+    "project_id": PROJECT_ID,   # optional label: leave this column out to share the file with other challenges
     "model_id": MODEL_ID,
     "reference_datetime": reference_date.strftime("%Y-%m-%d"),
     "datetime": forecast["date"].dt.strftime("%Y-%m-%d"),

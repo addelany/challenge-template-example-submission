@@ -1,5 +1,5 @@
-# Example forecast for the template challenge ("templatecast"): daily surface water
-# temperature at three lakes, up to 30 days ahead, as a 31-member ensemble.
+# Example forecast for the template challenge ("templatecast"): daily water
+# temperature at two reservoirs, up to 30 days ahead, as a 31-member ensemble.
 #
 # The model is a regression of water temperature on air temperature, driven by the NOAA
 # GEFS weather ensemble from dynamical.org:
@@ -166,7 +166,7 @@ forecast <- air_forecast |>
 # See the challenge's "How to forecast" page for the full description of the columns.
 forecast <- forecast |>
   transmute(
-    project_id = project_id,
+    project_id = project_id,   # optional label: leave this column out to share the file with other challenges
     model_id = model_id,
     reference_datetime = reference_date,
     datetime = as.Date(date),

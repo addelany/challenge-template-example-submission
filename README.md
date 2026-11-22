@@ -3,7 +3,7 @@
 A complete, working example of submitting forecasts to a challenge **from a
 GitHub repository**, built on the
 challenge template (`eco4cast/challenge-template`;
-project `templatecast`: daily surface water temperature at three lakes, up to
+project `templatecast`: daily water temperature at two reservoirs, up to
 30 days ahead). Copy it as the starting point for your own model.
 
 There is nothing to upload and no key to ask for. The challenge reads new files
@@ -11,7 +11,7 @@ from this repository, which only has to be **public**.
 
 ```
 challenge-model.yaml   which model this repository submits, and its metadata
-forecasts/             the forecast files: <theme>-<reference date>-<model_id>.csv.gz
+forecasts/             the forecast files (this example names them <theme>-<reference date>-<model_id>.csv.gz; any name works)
 forecast.R             makes a forecast and writes the file (R)
 forecast.py            the same forecast, in Python only
 gefs_weather.py        reads weather (any GEFS variables) from dynamical.org (Python)
@@ -140,12 +140,17 @@ Weather data: NOAA NWS NCEP GEFS (forecast and analysis), processed by dynamical
 
 ## What the challenge needs from you
 
-1. **Forecast files** in the folder named in `challenge-model.yaml`
-   (`forecasts/`). The name is `<theme>-<YYYY-MM-DD>-<model_id>.csv` or `.csv.gz`:
-   `lakes` is this challenge's theme, the date is the day the forecast starts
-   from, and the model id must match `challenge-model.yaml`. Columns:
-   `project_id`, `model_id`, `reference_datetime`, `datetime`, `duration`,
-   `site_id`, `variable`, `family`, `parameter` and `prediction`. A `normal`
+1. **Forecast files** (`.csv` or `.csv.gz`) in the folder named in `challenge-model.yaml`
+   (`forecasts/`). **The file name does not matter**: the challenge identifies a
+   forecast by its `model_id` and `reference_datetime` columns, and the model id must
+   be one listed in `challenge-model.yaml`. A file can hold several variables and
+   several reference dates, and the same file can go to every challenge in
+   `challenge-model.yaml` (each keeps only the rows with its own variables, durations
+   and sites). Columns: `model_id`, `reference_datetime`, `datetime`, `duration`,
+   `site_id`, `variable`, `family`, `parameter` and `prediction`; `project_id` is an
+   optional label for the challenge a row is for (leave it out for rows meant for
+   every challenge). If a forecast for the same model, reference date, variable and
+   duration is already stored, the first is kept. A `normal`
    forecast has a `mu` and a `sigma` row for every site and date; an ensemble
    (as here) uses `family = ensemble` or `sample` with the member number as `parameter`.
 2. **`challenge-model.yaml`** at the top of the repository. It names the
@@ -153,9 +158,11 @@ Weather data: NOAA NWS NCEP GEFS (forecast and analysis), processed by dynamical
    model registration form; the challenge builds the model's catalog entry from
    it, and re-reads it when it changes. Leave out any question you do not want to
    answer.
-3. **Registration.** Open the **Register a forecast repository** issue form on the
-   challenge repository and give this repository's address. A bot checks it,
-   adds it to the list of repositories the challenge reads, and closes the issue.
+3. **Registration.** Open the **Register a model repository** issue form on the
+   challenge repository, give this repository's address (it can be on GitHub, GitLab,
+   Bitbucket or Codeberg) and say that your forecasts are in the repository. A bot
+   checks it, adds it to the list of repositories the challenge reads, and closes
+   the issue.
 
 After that, every new file is checked the next time the challenge processes
 submissions. What happened to each file, with the reason for any rejection, is
@@ -181,22 +188,24 @@ pip install -r requirements.txt
 git pull --rebase                      # picks up anything pushed from elsewhere
 python forecast.py                     # or: Rscript forecast.R, or any tool you like
 git status                             # one new file in forecasts/
-python check_forecast.py forecasts/lakes-2026-11-20-example_lake_model.csv.gz   # exit status 0 = fine
+python check_forecast.py forecasts/lakes-2026-11-20-example_lake_model.csv.gz \
+    --challenge https://raw.githubusercontent.com/rqthomas/challenge-template/main/challenge_configuration.yaml   # exit status 0 = fine
 git add forecasts/lakes-2026-11-20-example_lake_model.csv.gz   # the file it wrote
 git commit -m "Forecast for 2026-11-20"
 git push
 ```
 
-- **Any tool will do.** The only requirement is a file in `forecasts/` named
-  `<theme>-<YYYY-MM-DD>-<model_id>.csv.gz` (or `.csv`), in the format described above. If a
-  model of your own makes it, save it there with that name and `git add` it.
+- **Any tool will do.** The only requirement is a `.csv` or `.csv.gz` file in `forecasts/`, in
+  the format described above. If a model of your own makes it, save it there and `git add` it.
 - **Add new files; never edit one the challenge has read.** A file is read the first time
   it is seen, and later changes to it are ignored, so a corrected forecast needs a new
-  reference date (a new file name). Do not force-push or rewrite history over files you
+  reference date (a new file). Do not force-push or rewrite history over files you
   have already pushed.
-- **Check the name before you push.** The date is the day the forecast starts from, the
-  model id must be the one in `challenge-model.yaml`, and the folder must be the `path`
-  given there. A file with another name is skipped, and the reason is published.
+- **Check the file before you push.** `check_forecast.py --challenge <config>` (give the
+  address of each challenge's `challenge_configuration.yaml`) says how many rows each
+  challenge would keep and why it drops the rest. The model id must be the one in
+  `challenge-model.yaml`, and the folder must be the `path` given there. A file the
+  challenge cannot use is skipped or rejected, and the reason is published.
 - **Signing in to GitHub.** `git push` needs your credentials: sign in with the GitHub CLI
   (`gh auth login`), use an SSH key, or give a personal access token when asked for a
   password. The repository itself must stay **public**, because the challenge reads it
@@ -290,8 +299,8 @@ status `processed`**. These are kept, with the reason printed:
 
 `--keep-days D` keeps every forecast from the last `D` days whether or not the challenge
 has it, which gives you a window of recent forecasts to look at (or to resubmit from if
-something went wrong). A forecast's age is today (UTC) minus the date in its file name,
-so with `--keep-days 7` the files dated 7 days ago or later stay. `--keep N` and
+something went wrong). A forecast's age is today (UTC) minus its reference date,
+so with `--keep-days 7` the files with a reference date 7 days ago or later stay. `--keep N` and
 `--keep-days D` are independent: a forecast stays if it is among the newest `N` the
 challenge has *or* is from the last `D` days. The workflow has an input for each.
 
