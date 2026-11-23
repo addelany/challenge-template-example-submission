@@ -4,18 +4,14 @@
 # Keys after `path` are the questions of the challenge's model registration form.
 challenge: templatecast            # the challenge's project_id
 models:
-  - model_id: example_lake_model   # must match the model_id in the file names
+  - model_id: chronos2   # must match the model_id in the file names
     path: forecasts/               # where the forecast files are
-    long_name: Example lake temperature model (GEFS air temperature regression)
+    long_name: Chronos2 lake temperature model (univariate time series forecasting)
     description: >-
-      At each lake, a linear regression of daily mean water temperature on daily mean
-      2 m air temperature from the NOAA GEFS analysis, fitted to the past year. It is driven by the
-      31 members of the NOAA GEFS ensemble weather forecast (both read from dynamical.org), each member's air temperature
-      passed through the regression plus a draw from its residuals, to give a 31-member ensemble
-      forecast of water temperature. A deliberately simple model that shows the ensemble
       submission format and how to read weather forecasts from dynamical.org.
-    code_url: https://github.com/rqthomas/challenge-template-example-submission
-    contact_name: Example Author
+      The Chronos model is a pretrained time series model developed by Amazon for zero-shot time series forecasting.
+    code_url: https://github.com/addelany/challenge-template-example-submission
+    contact_name: Austin Delany
     model_type: empirical
     dynamic: false
     ic_uncertainty: false
