@@ -31,34 +31,34 @@ jobs:
       # The weather comes from dynamical.org through Python (gefs_weather.py).
       # zarr 3 and icechunk need Python 3.11 or newer, which the image may not have, so
       # uv installs one in a virtual environment.
-      - name: Install Python and the weather packages
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends python3 python3-venv python3-pip
-          python3 -m venv /opt/bootstrap
-          /opt/bootstrap/bin/pip install --quiet uv
-          /opt/bootstrap/bin/uv venv /opt/venv --python 3.12
-          /opt/bootstrap/bin/uv pip install --python /opt/venv/bin/python -r requirements.txt
-          echo "PYTHON=/opt/venv/bin/python" >> "$GITHUB_ENV"
+      # - name: Install Python and the weather packages
+      #   run: |
+      #     apt-get update
+      #     apt-get install -y --no-install-recommends python3 python3-venv python3-pip
+      #     python3 -m venv /opt/bootstrap
+      #     /opt/bootstrap/bin/pip install --quiet uv
+      #     /opt/bootstrap/bin/uv venv /opt/venv --python 3.12
+      #     /opt/bootstrap/bin/uv pip install --python /opt/venv/bin/python -r requirements.txt
+      #     echo "PYTHON=/opt/venv/bin/python" >> "$GITHUB_ENV"
 
       # paws.storage, the S3 client, is only used when the challenge's bucket is
       # private (it is plain R: nothing else is installed).
-      - name: Install packages
-        run: Rscript -e 'install.packages("paws.storage")'
+      # - name: Install packages
+      #   run: Rscript -e 'install.packages("paws.storage")'
 
       # Set the secrets S3_KEY and S3_SECRET (a key that can read the challenge's
       # bucket) if the bucket is private. Without them the targets are read by URL.
       - name: Make the forecast
-        env:
-          S3_KEY: ${{ secrets.S3_KEY }}
-          S3_SECRET: ${{ secrets.S3_SECRET }}
+        # env:
+        #   S3_KEY: ${{ secrets.S3_KEY }}
+        #   S3_SECRET: ${{ secrets.S3_SECRET }}
         run: Rscript forecast.R
 
       - name: Commit the forecast
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
           git add forecasts/
           git diff --cached --quiet || git commit -m "Forecast for $(date -u +%F)"
           git push

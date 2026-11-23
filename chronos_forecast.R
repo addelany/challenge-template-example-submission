@@ -60,7 +60,7 @@ chronos_insitu <- purrr::pmap_dfr(site_var_combinations,
                                                                    forecast_date = curr_reference_datetime,
                                                                    depth = 'target',
                                                                    ...))
-file_date <- combined_chronos$reference_datetime[1]
+file_date <- chronos_insitu$reference_datetime[1]
 forecast_file <- paste0(paste("daily", file_date, team_name, sep = "-"), ".csv.gz")
 
 write.csv(chronos_insitu, paste0('./forecasts/',forecast_file))
