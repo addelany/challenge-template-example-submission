@@ -40,7 +40,8 @@ chronos <- reticulate::import("chronos")
 targets_insitu <- readr::read_csv(paste0("https://amnh1.osn.mghpcc.org/bio230121-bucket01/vera4cast/targets/project_id=vera4cast/duration=P1D/daily-insitu-targets.csv.gz"), guess_max = 10000)
 # targets_met <- readr::read_csv(paste0("https://", config$endpoint, "/", config$targets_bucket, "/project_id=vera4cast/duration=P1D/daily-met-targets.csv.gz"), guess_max = 10000, show_col_types = FALSE)
 # targets_tubr <- readr::read_csv(paste0("https://", config$endpoint, "/", config$targets_bucket, "/project_id=vera4cast/duration=P1D/daily-inflow-targets.csv.gz"), guess_max = 10000, show_col_types = FALSE)
-
+targets_insitu <- targets_insitu |>
+  mutate(variable = ifelse(variable == 'Temp_C_mean', 'temperature', variable))
 
 # set run date
 curr_reference_datetime <- Sys.Date()
@@ -49,7 +50,7 @@ curr_reference_datetime <- Sys.Date()
 # get all combinations
 print('Insitu model')
 
-site_var_combinations <- expand.grid(var = c('Temp_C_mean'),
+site_var_combinations <- expand.grid(var = c('temperature'),
                                      site = c('fcre',
                                               'bvre'))
 
