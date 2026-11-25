@@ -48,7 +48,7 @@ jobs:
 
       # install required packages
       - name: Install Packages
-        run: Rscript -e 'install.packages(c("imputeTS", "tsibble"))'
+        run: Rscript -e 'install.packages(c("imputeTS", "tsibble", "reticulate"))'
 
       # Set the secrets S3_KEY and S3_SECRET (a key that can read the challenge's
       # bucket) if the bucket is private. Without them the targets are read by URL.

@@ -16,6 +16,7 @@ library(lubridate)
 #library(aws.s3)
 library(imputeTS)
 library(tsibble)
+library(reticulate)
 
 # Sys.unsetenv("AWS_DEFAULT_REGION")
 # Sys.unsetenv("AWS_S3_ENDPOINT")
