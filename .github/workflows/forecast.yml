@@ -52,7 +52,7 @@ jobs:
         # env:
         #   S3_KEY: ${{ secrets.S3_KEY }}
         #   S3_SECRET: ${{ secrets.S3_SECRET }}
-        run: Rscript forecast.R
+        run: Rscript chronos_forecast.R
 
       - name: Commit the forecast
         run: |
