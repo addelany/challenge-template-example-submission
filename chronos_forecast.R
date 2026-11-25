@@ -13,7 +13,7 @@ print(paste0("Running Chronos at ", Sys.time()))
 
 library(tidyverse)
 library(lubridate)
-library(aws.s3)
+#library(aws.s3)
 library(imputeTS)
 library(tsibble)
 library(fable)
