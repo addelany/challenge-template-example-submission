@@ -50,6 +50,20 @@ jobs:
       - name: Install Packages
         run: Rscript -e 'install.packages(c("imputeTS", "tsibble", "reticulate"))'
 
+
+      - name: Install system Python tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv python3-pip python3-dev
+
+      - name: Install Python deps for Chronos2
+        shell: Rscript {0}
+        run: |
+          reticulate::py_install(
+            packages = c("torch", "numpy", "chronos-forecasting"),
+            pip = TRUE
+          )
+
       # Set the secrets S3_KEY and S3_SECRET (a key that can read the challenge's
       # bucket) if the bucket is private. Without them the targets are read by URL.
       - name: Make the forecast
